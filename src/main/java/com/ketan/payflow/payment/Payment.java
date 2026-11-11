@@ -3,6 +3,7 @@ package com.ketan.payflow.payment;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.ketan.payflow.ledger.MoveCommand;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -31,5 +32,18 @@ public class Payment {
     private String idempotencyKey;
     private Instant createdAt;
 
-    // The static factory method is added in Step 6
+    public static Payment completed(MoveCommand cmd) {
+        Payment p = new Payment();
+        p.id = UUID.randomUUID();
+        p.type = cmd.type();
+        p.fromWalletId = cmd.fromWalletId();
+        p.toWalletId = cmd.toWalletId();
+        p.amount = cmd.amount();
+        p.status = PaymentStatus.COMPLETED;
+        p.note = cmd.note();
+        p.createdBy = cmd.createdBy();
+        p.idempotencyKey = cmd.idempotencyKey();
+        p.createdAt = Instant.now();
+        return p;
+    }
 }

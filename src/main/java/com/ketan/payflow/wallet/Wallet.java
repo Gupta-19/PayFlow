@@ -3,6 +3,7 @@ package com.ketan.payflow.wallet;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.ketan.payflow.common.InsufficientFundsException;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -38,5 +39,17 @@ public class Wallet {
         return w;
     }
 
-    // credit() and debit() are added in Step 6
+    // Only LedgerService.move() may call credit() and debit()
+    public void credit(long amount) {
+        balance += amount;
+        updatedAt = Instant.now();
+    }
+
+    public void debit(long amount) {
+        if (kind == WalletKind.USER && balance < amount) {   // the SYSTEM wallet may go negative
+            throw new InsufficientFundsException(balance, amount);
+        }
+        balance -= amount;
+        updatedAt = Instant.now();
+    }
 }

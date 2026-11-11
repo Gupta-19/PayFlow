@@ -18,6 +18,9 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  jackson:
+    deserialization:
+      accept-float-as-int: false   # {"amount": 100.5} is a 400, not silently truncated to 100
 
 server:
   port: 8080
