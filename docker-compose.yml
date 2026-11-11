@@ -20,5 +20,21 @@ services:
       interval: 5s
       retries: 10
 
+  app:
+    build: .
+    ports: ["${APP_PORT:-8080}:8080"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/payflow
+      DB_USER: payflow
+      DB_PASSWORD: payflow
+      REDIS_HOST: redis
+      JWT_PRIVATE_KEY: file:/keys/private.pem
+      JWT_PUBLIC_KEY: file:/keys/public.pem
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
 volumes:
   pgdata:

@@ -1,0 +1,6 @@
+target/
+keys/
+.git/
+.idea/
+.claude/
+.env
