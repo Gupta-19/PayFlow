@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: payflow
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/payflow}
+    username: ${DB_USER:payflow}
+    password: ${DB_PASSWORD:payflow}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks it matches
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    issuer: payflow
+    access-token-ttl: 15m
+    refresh-token-ttl: 7d
+    private-key: ${JWT_PRIVATE_KEY:file:keys/private.pem}
+    public-key: ${JWT_PUBLIC_KEY:file:keys/public.pem}
+  idempotency:
+    in-progress-ttl: 60s
+    completed-ttl: 24h
+  payments:
+    max-amount: 10000000   # paise = Rs 1,00,000 per payment
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

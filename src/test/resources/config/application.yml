@@ -1,0 +1,4 @@
+app:
+  jwt:
+    private-key: classpath:test-keys/private.pem
+    public-key: classpath:test-keys/public.pem

@@ -284,7 +284,9 @@ management:
         http.server.requests: true
 ```
 
-### 2.4 `src/test/resources/application.yml` (test overrides)
+### 2.4 `src/test/resources/config/application.yml` (test overrides)
+
+> Put it in `config/`, not next to the main file: a second `classpath:application.yml` would *replace* the main config in tests instead of overriding just these keys.
 
 ```yaml
 app:
@@ -335,7 +337,8 @@ Add `@ConfigurationPropertiesScan` to `PayflowApplication` so all three are pick
 
 - [ ] `docker compose up -d`, then `docker compose ps` shows both containers as healthy
 - [ ] `./mvnw spring-boot:run` logs "Started PayflowApplication"
-- [ ] The log also shows a generated security password, and `curl -i localhost:8080/actuator/health` returns 401: both are expected until Step 5 adds your own security config
+- [ ] `curl -i localhost:8080/actuator/health` returns 200, while `/actuator/info` and any other path return 401. (Boot 4.1.2 permits health by default, and creates no generated password because OAuth2 Resource Server is on the classpath.)
+- [ ] On a machine whose zone is India Standard Time, the JVM default zone `Asia/Calcutta` is rejected by Postgres 16. PayFlow forces UTC in `main` and in the surefire `argLine`.
 - [ ] `git status` does not list `keys/`
 
 ---
