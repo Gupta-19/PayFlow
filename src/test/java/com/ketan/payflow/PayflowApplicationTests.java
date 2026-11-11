@@ -1,12 +1,9 @@
 package com.ketan.payflow;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
-@Import(TestcontainersConfiguration.class)
-@SpringBootTest
-class PayflowApplicationTests {
+// Extends ApiTestBase so it shares the single Spring context and Testcontainers with the other tests
+class PayflowApplicationTests extends ApiTestBase {
 
 	@Test
 	void contextLoads() {
