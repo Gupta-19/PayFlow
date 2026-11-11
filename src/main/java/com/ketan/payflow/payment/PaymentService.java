@@ -3,6 +3,7 @@ package com.ketan.payflow.payment;
 import java.util.UUID;
 
 import com.ketan.payflow.common.AmountTooLargeException;
+import com.ketan.payflow.common.IdempotencyKeyReusedException;
 import com.ketan.payflow.common.PaymentNotFoundException;
 import com.ketan.payflow.common.RecipientNotFoundException;
 import com.ketan.payflow.common.SelfPaymentException;
@@ -16,6 +17,7 @@ import com.ketan.payflow.wallet.Wallet;
 import com.ketan.payflow.wallet.WalletKind;
 import com.ketan.payflow.wallet.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,9 +36,21 @@ public class PaymentService {
                 .orElseThrow(RecipientNotFoundException::new);
         if (from.getId().equals(to.getId())) throw new SelfPaymentException();
 
-        Payment p = ledger.move(new MoveCommand(PaymentType.TRANSFER, from.getId(), to.getId(),
-                req.amount(), userId, idempotencyKey, req.note()));
-        return PaymentResponse.from(p);
+        try {
+            Payment p = ledger.move(new MoveCommand(PaymentType.TRANSFER, from.getId(), to.getId(),
+                    req.amount(), userId, idempotencyKey, req.note()));
+            return PaymentResponse.from(p);
+        } catch (DataIntegrityViolationException e) {
+            // Redis lost the key but this payment already exists: return the original
+            Payment existing = payments.findByCreatedByAndIdempotencyKey(userId, idempotencyKey)
+                    .orElseThrow(() -> e);   // some other constraint failed: rethrow
+            if (existing.getType() != PaymentType.TRANSFER
+                    || !existing.getToWalletId().equals(to.getId())
+                    || existing.getAmount() != req.amount()) {
+                throw new IdempotencyKeyReusedException();   // same key, different request
+            }
+            return PaymentResponse.from(existing);
+        }
     }
 
     public PaymentResponse get(UUID userId, UUID paymentId) {

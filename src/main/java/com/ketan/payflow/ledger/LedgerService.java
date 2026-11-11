@@ -48,7 +48,8 @@ public class LedgerService {
         to.credit(cmd.amount());
 
         // 3. Record the payment and its two ledger entries
-        Payment payment = payments.save(Payment.completed(cmd));
+        // saveAndFlush so a duplicate (created_by, idempotency_key) fails right here as DataIntegrityViolationException
+        Payment payment = payments.saveAndFlush(Payment.completed(cmd));
         entries.save(LedgerEntry.debit(payment.getId(), from.getId(), cmd.amount()));
         entries.save(LedgerEntry.credit(payment.getId(), to.getId(), cmd.amount()));
 
