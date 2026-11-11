@@ -605,6 +605,7 @@ public class InsufficientFundsException extends ApiException {
 | `RecipientNotFoundException` | 404 | `recipient-not-found` | `toWalletId` doesn't exist or isn't a user wallet |
 | `PaymentNotFoundException` | 404 | `payment-not-found` | Payment doesn't exist or the caller isn't part of it |
 | `SelfPaymentException` | 400 | `self-payment` | Paying your own wallet |
+| `PasswordTooLongException` | 400 | `password-too-long` | Signup password over 72 UTF-8 bytes (BCrypt's limit) |
 | `AmountTooLargeException` | 422 | `amount-too-large` | Amount above `app.payments.max-amount` |
 | `InsufficientFundsException` | 422 | `insufficient-funds` | Sender's balance is below the amount |
 | `InvalidIdempotencyKeyException` | 400 | `invalid-idempotency-key` | Key blank or longer than 100 characters |
