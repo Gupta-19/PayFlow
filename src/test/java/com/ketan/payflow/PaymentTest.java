@@ -88,6 +88,27 @@ class PaymentTest extends ApiTestBase {
     }
 
     @Test
+    void metrics_countPaymentsByOutcome() {
+        Account a = newAccount();
+        Account b = newAccount();
+        topUp(a, 1_000, key());
+        double completedBefore = paymentCount("TRANSFER", "completed");
+        double insufficientBefore = paymentCount("TRANSFER", "insufficient_funds");
+
+        assertThat(pay(a, b.walletId(), 500, key())).isEqualTo(201);
+        assertThat(pay(a, b.walletId(), 5_000, key())).isEqualTo(422);
+
+        assertThat(paymentCount("TRANSFER", "completed") - completedBefore).isEqualTo(1.0);
+        assertThat(paymentCount("TRANSFER", "insufficient_funds") - insufficientBefore).isEqualTo(1.0);
+
+        ResponseEntity<String> res = http.get().uri("/actuator/prometheus").retrieve().toEntity(String.class);   // public
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        assertThat(res.getBody())
+                .containsPattern("payflow_payments_total\\{[^}]*outcome=\"completed\"[^}]*type=\"TRANSFER\"")
+                .containsPattern("payflow_payments_total\\{[^}]*outcome=\"insufficient_funds\"[^}]*type=\"TRANSFER\"");
+    }
+
+    @Test
     void otherUsersPayment_returns404() {
         Account a = newAccount();
         Account b = newAccount();

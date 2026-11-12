@@ -23,7 +23,9 @@ class IdempotencyTest extends ApiTestBase {
         String key = "pay-" + UUID.randomUUID();
 
         ResponseEntity<Map<String, Object>> first = payEntity(a, b.walletId(), 2_500, key);
+        double completedBefore = paymentCount("TRANSFER", "completed");
         ResponseEntity<Map<String, Object>> second = payEntity(a, b.walletId(), 2_500, key);
+        assertThat(paymentCount("TRANSFER", "completed")).isEqualTo(completedBefore);   // the replay moved nothing
 
         assertThat(first.getStatusCode().value()).isEqualTo(201);
         assertThat(first.getHeaders().getFirst("Idempotent-Replayed")).isNull();
@@ -141,7 +143,9 @@ class IdempotencyTest extends ApiTestBase {
 
         forgetKey(key);
 
+        double completedBefore = paymentCount("TRANSFER", "completed");
         ResponseEntity<Map<String, Object>> retry = payEntity(a, b.walletId(), 2_500, key);   // JWT still valid
+        assertThat(paymentCount("TRANSFER", "completed")).isEqualTo(completedBefore);   // backstop: rolled back, not counted
         assertThat(retry.getStatusCode().value()).isEqualTo(201);
         assertThat(retry.getHeaders().getFirst("Idempotent-Replayed")).isNull();   // answered by the DB backstop
         assertThat(retry.getBody().get("id")).isEqualTo(first.getBody().get("id"));

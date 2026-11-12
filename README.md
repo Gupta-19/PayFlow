@@ -96,13 +96,25 @@ curl -s $API/wallets/me/transactions -H "$AUTH" | jq   # newest first: DEBIT 250
 
 **JVM pinned to UTC.** On a machine set to India Standard Time the JVM reports the legacy zone `Asia/Calcutta`, which pgjdbc sends to Postgres on connect and Postgres 16 rejects. `main()` and the Surefire `argLine` set UTC, and all timestamps are `Instant`/`TIMESTAMPTZ`.
 
+## Metrics
+
+Compose also starts Prometheus at [localhost:9090](http://localhost:9090), which scrapes `app:8080/actuator/prometheus` (see `prometheus.yml`), and Grafana at [localhost:3000](http://localhost:3000) (log in with `admin` / `admin`, then add a Prometheus data source with the URL `http://prometheus:9090`). `payflow_payments_total{type, outcome}` counts payments as `completed` (after commit) or `insufficient_funds`.
+
+| Panel | PromQL |
+|---|---|
+| Payments per second by outcome | `sum by (outcome) (rate(payflow_payments_total[1m]))` |
+| p95 latency of `POST /payments` | `histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri="/payments", method="POST"}[5m])))` |
+| Server errors per second | `sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))` |
+
+The p95 query returns NaN until there has been `POST /payments` traffic in the last 5 minutes. Prometheus and Grafana are bound to `127.0.0.1` only, and Grafana uses the default `admin`/`admin` login, so this setup is for local use only.
+
 ## Testing
 
 ```bash
-./mvnw verify     # needs Docker: Postgres and Redis run in Testcontainers
+./mvnw verify     # needs Docker: Postgres, Redis and Kafka run in Testcontainers
 ```
 
-19 tests (18 drive the real API over HTTP, plus a context-load test) run against real Postgres and Redis, with no mocks of our own classes:
+30 tests (28 drive the real API over HTTP, plus a context-load test and a source scan that keeps balance changes inside `LedgerService`) run against real Postgres, Redis and Kafka, with no mocks of our own classes:
 
 - **Concurrency:**
   - 20 parallel Rs 10 payments from a Rs 100 wallet: exactly 10 succeed, 10 get 422, and the balance ends at 0.

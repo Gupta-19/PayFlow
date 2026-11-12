@@ -2,16 +2,20 @@ package com.ketan.payflow.ledger;
 
 import java.util.UUID;
 
+import com.ketan.payflow.common.InsufficientFundsException;
 import com.ketan.payflow.common.WalletNotFoundException;
 import com.ketan.payflow.payment.Payment;
 import com.ketan.payflow.payment.PaymentCompletedEvent;
 import com.ketan.payflow.payment.PaymentRepository;
 import com.ketan.payflow.wallet.Wallet;
 import com.ketan.payflow.wallet.WalletRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +24,7 @@ public class LedgerService {
     private final PaymentRepository payments;
     private final LedgerEntryRepository entries;
     private final ApplicationEventPublisher events;
+    private final MeterRegistry registry;
 
     /**
      * Moves money between two wallets in one transaction: locks both rows, debits, credits,
@@ -32,6 +37,24 @@ public class LedgerService {
      */
     @Transactional
     public Payment move(MoveCommand cmd) {
+        String type = cmd.type().name();
+        try {
+            Payment payment = doMove(cmd);
+            // Count "completed" only once the transaction has really committed
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    registry.counter("payflow.payments", "type", type, "outcome", "completed").increment();
+                }
+            });
+            return payment;
+        } catch (InsufficientFundsException e) {
+            registry.counter("payflow.payments", "type", type, "outcome", "insufficient_funds").increment();
+            throw e;
+        }
+    }
+
+    private Payment doMove(MoveCommand cmd) {
         if (cmd.amount() <= 0) throw new IllegalArgumentException("amount must be positive");
         if (cmd.fromWalletId().equals(cmd.toWalletId())) {
             throw new IllegalArgumentException("fromWalletId and toWalletId must differ");

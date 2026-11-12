@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
 import java.util.UUID;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
@@ -19,12 +21,14 @@ import org.springframework.web.client.RestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
+@AutoConfigureMetrics   // keep the Prometheus endpoint on in tests (on the base class, so all tests share one context)
 abstract class ApiTestBase {
     static final ParameterizedTypeReference<Map<String, Object>> JSON = new ParameterizedTypeReference<>() {};
     static final String PASSWORD = "password123";
 
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
+    @Autowired MeterRegistry meters;
     RestClient http;
 
     record Account(String token, UUID walletId, String email, String refreshToken) {}
@@ -83,6 +87,11 @@ abstract class ApiTestBase {
         ResponseEntity<Map<String, Object>> res = get("/wallets/me", account.token());
         assertThat(res.getStatusCode().value()).isEqualTo(200);
         return ((Number) res.getBody().get("balance")).longValue();
+    }
+
+    /** Current value of the payflow.payments counter (tests run one at a time, so deltas are exact). */
+    double paymentCount(String type, String outcome) {
+        return meters.counter("payflow.payments", "type", type, "outcome", outcome).count();
     }
 
     @AfterEach
