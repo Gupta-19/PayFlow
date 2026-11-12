@@ -21,6 +21,16 @@ spring:
   jackson:
     deserialization:
       accept-float-as-int: false   # {"amount": 100.5} is a 400, not silently truncated to 100
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9094}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true   # no duplicate writes when the producer retries
+        max.block.ms: 2000         # a missing broker can't stall the request thread for 60 s
+    consumer:
+      group-id: webhook-dispatcher
+      auto-offset-reset: earliest
 
 server:
   port: 8080
@@ -37,6 +47,10 @@ app:
     completed-ttl: 24h
   payments:
     max-amount: 10000000   # paise = Rs 1,00,000 per payment
+  webhook:
+    url: ${WEBHOOK_URL:http://localhost:8080/demo/merchant-webhook}
+    secret: ${WEBHOOK_SECRET:dev-secret}
+    demo-receiver: false   # true enables /demo/merchant-webhook (docker-compose turns it on)
 
 management:
   endpoints:

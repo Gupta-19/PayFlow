@@ -37,6 +37,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(PUBLIC_AUTH_PATHS.toArray(String[]::new)).permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/prometheus", "/error").permitAll()
+                        .requestMatchers("/demo/merchant-webhook/**").permitAll()   // demo receiver (off unless enabled); checks its own HMAC
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o
                         .bearerTokenResolver(bearerTokenResolver)

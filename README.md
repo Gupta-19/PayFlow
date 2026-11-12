@@ -120,7 +120,9 @@ CI (`.github/workflows/ci.yml`) runs `./mvnw -B verify` and builds the Docker im
 
 ## Known limitations and what I'd add next
 
-- **Transactional outbox** for `payment.completed` events and webhooks, so events are published reliably after commit.
+- **Webhooks are at-least-once:** a retry after a timeout can deliver the same event twice, so receivers must de-duplicate by `paymentId`. The demo receiver does this, and it is enabled only in docker-compose (`APP_WEBHOOK_DEMO_RECEIVER=true`). The signature's 5-minute timestamp window has no nonce, so a captured webhook can be replayed within that window; de-duplication by `paymentId` covers this.
+- **The app needs Kafka resolvable at startup:** if the `kafka` host can't be resolved, the listener fails to start and the app exits. Compose sets `restart: unless-stopped`, so it keeps retrying until Kafka is back. Once running, the app stays up if Kafka goes down later, and payments keep working.
+- **Webhook events can be lost if Kafka is down at commit time** (or the app crashes between commit and send). The payment itself still succeeds: publishing happens after commit, failures are only logged, and `max.block.ms` is 2 s so a missing broker can't stall the request. The fix is a **transactional outbox**: write the event in the same transaction and let a relay publish it.
 - **SYSTEM wallet is a hot row:** every top-up locks it, so top-ups are serialized. Sharding it into several system wallets would fix this.
 - **Business errors are cached for 24 h** under their idempotency key, so a client that fixes the cause (for example by adding funds) must use a new key.
 - **Redis outage fails closed:** money endpoints return 500 rather than risk a double charge.

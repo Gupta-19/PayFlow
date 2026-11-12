@@ -4,10 +4,12 @@ import java.util.UUID;
 
 import com.ketan.payflow.common.WalletNotFoundException;
 import com.ketan.payflow.payment.Payment;
+import com.ketan.payflow.payment.PaymentCompletedEvent;
 import com.ketan.payflow.payment.PaymentRepository;
 import com.ketan.payflow.wallet.Wallet;
 import com.ketan.payflow.wallet.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ public class LedgerService {
     private final WalletRepository wallets;
     private final PaymentRepository payments;
     private final LedgerEntryRepository entries;
+    private final ApplicationEventPublisher events;
 
     /**
      * Moves money between two wallets in one transaction: locks both rows, debits, credits,
@@ -53,7 +56,11 @@ public class LedgerService {
         entries.save(LedgerEntry.debit(payment.getId(), from.getId(), cmd.amount()));
         entries.save(LedgerEntry.credit(payment.getId(), to.getId(), cmd.amount()));
 
-        // 4. The new balances are written at commit (JPA dirty checking)
+        // 4. Announce it. PaymentEventPublisher sends to Kafka only AFTER_COMMIT, so a rollback is never announced.
+        events.publishEvent(new PaymentCompletedEvent(payment.getId(), from.getId(), to.getId(),
+                cmd.amount(), payment.getCreatedAt()));
+
+        // 5. The new balances are written at commit (JPA dirty checking)
         return payment;
     }
 }
