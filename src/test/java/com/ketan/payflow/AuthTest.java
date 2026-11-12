@@ -2,6 +2,7 @@ package com.ketan.payflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -68,6 +69,27 @@ class AuthTest extends ApiTestBase {
         ResponseEntity<Map<String, Object>> second = post("/auth/refresh", null, null,
                 Map.of("refreshToken", a.refreshToken()));
         assertThat(second.getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void refresh_ignoresGarbageBearerHeader() {
+        Account a = newAccount();
+        ResponseEntity<Map<String, Object>> res = post("/auth/refresh", "xxx", null,
+                Map.of("refreshToken", a.refreshToken()));   // stale/invalid token must not block a refresh
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        assertThat((String) res.getBody().get("accessToken")).isNotBlank();
+    }
+
+    @Test
+    void signup_passwordOver72Bytes_returns400() {
+        String password = "अ".repeat(25);   // Devanagari "a": 25 chars, 75 UTF-8 bytes
+        assertThat(password.length()).isLessThanOrEqualTo(72);
+        assertThat(password.getBytes(StandardCharsets.UTF_8).length).isGreaterThan(72);
+
+        ResponseEntity<Map<String, Object>> res = post("/auth/signup", null, null,
+                Map.of("email", UUID.randomUUID() + "@test.com", "password", password));
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(res.getBody().get("type")).isEqualTo("/errors/password-too-long");
     }
 
     @Test
